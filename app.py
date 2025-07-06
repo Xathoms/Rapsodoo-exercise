@@ -1,10 +1,12 @@
 import logging
 import os
+from datetime import date, datetime
 
 from flask import Flask
 
 from config import config
 from database import db
+from routes import register_blueprints
 
 
 logging.basicConfig(
@@ -28,6 +30,17 @@ def create_app(config_name=None):
     app.config.from_object(config[config_name])
 
     db.init_app(app)
+    register_blueprints(app)
+
+    @app.template_global()
+    def now():
+        """Make current datetime available in templates."""
+        return datetime.now()
+
+    @app.template_global()
+    def today():
+        """Make current date available in templates."""
+        return date.today()
 
     with app.app_context():
         create_database_tables()
