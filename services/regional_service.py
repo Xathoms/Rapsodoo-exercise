@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class RegionalDataService:
-    """Enhanced service class for regional data aggregation and retrieval."""
+    """Simplified service class for regional data aggregation and retrieval."""
 
     def __init__(self):
         pass
@@ -20,10 +20,12 @@ class RegionalDataService:
     def get_regional_summary_for_date(
         self,
         target_date: Union[date, str] = "latest",
-        sort_by: str = "cases_desc",
         limit: Optional[int] = None,
     ) -> List[RegionalSummary]:
-        """Get regional summary data for a specific date with sorting options."""
+        """
+        Get regional summary data for a specific date.
+        Always returns data sorted by cases (descending) then by name (ascending) as default.
+        """
         try:
             if target_date == "latest":
                 latest_timestamp = db.session.query(
@@ -56,27 +58,11 @@ class RegionalDataService:
                 )
                 .filter(CovidDataRecord.data_timestamp == query_timestamp)
                 .group_by(CovidDataRecord.denominazione_regione)
+                .order_by(
+                    func.sum(CovidDataRecord.totale_casi).desc(),
+                    CovidDataRecord.denominazione_regione.asc(),
+                )
             )
-
-            if sort_by == "cases_desc":
-                query = query.order_by(
-                    func.sum(CovidDataRecord.totale_casi).desc(),
-                    CovidDataRecord.denominazione_regione.asc(),
-                )
-            elif sort_by == "cases_asc":
-                query = query.order_by(
-                    func.sum(CovidDataRecord.totale_casi).asc(),
-                    CovidDataRecord.denominazione_regione.asc(),
-                )
-            elif sort_by == "name_asc":
-                query = query.order_by(CovidDataRecord.denominazione_regione.asc())
-            elif sort_by == "name_desc":
-                query = query.order_by(CovidDataRecord.denominazione_regione.desc())
-            else:
-                query = query.order_by(
-                    func.sum(CovidDataRecord.totale_casi).desc(),
-                    CovidDataRecord.denominazione_regione.asc(),
-                )
 
             if limit:
                 query = query.limit(limit)
@@ -84,16 +70,13 @@ class RegionalDataService:
             regional_data = query.all()
 
             summaries = []
-            for rank, (region_name, total_cases, provinces_count) in enumerate(
-                regional_data, 1
-            ):
+            for region_name, total_cases, provinces_count in regional_data:
                 summaries.append(
                     RegionalSummary(
                         region_name=region_name,
                         total_cases=total_cases,
                         provinces_count=provinces_count,
                         last_updated=query_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                        rank=rank if sort_by.startswith("cases_") else None,
                     )
                 )
 

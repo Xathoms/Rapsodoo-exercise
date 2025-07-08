@@ -55,10 +55,11 @@ def api_export_excel():
 
 @api_bp.route("/regions")
 def api_regions():
-    """API endpoint returning regional data as JSON."""
+    """
+    API endpoint returning regional data as JSON.
+    """
     try:
         search_date = request.args.get("date", "latest")
-        sort_by = request.args.get("sort", "cases_desc")
         limit = request.args.get("limit", type=int)
         format_type = request.args.get("format", "summary")
 
@@ -71,7 +72,7 @@ def api_regions():
                 ), 400
 
         regional_summaries = regional_service.get_regional_summary_for_date(
-            target_date=parsed_date, sort_by=sort_by, limit=limit
+            target_date=parsed_date, limit=limit
         )
 
         if format_type == "detailed":
@@ -83,7 +84,6 @@ def api_regions():
                     "total_cases": summary.total_cases,
                     "provinces_count": summary.provinces_count,
                     "last_updated": summary.last_updated,
-                    "rank": summary.rank,
                 }
                 for summary in regional_summaries
             ]
@@ -94,7 +94,7 @@ def api_regions():
                 "data": data,
                 "metadata": {
                     "query_date": str(parsed_date),
-                    "sort_by": sort_by,
+                    "default_sort": "cases_desc_name_asc",
                     "total_regions": len(regional_summaries),
                     "total_cases": sum(
                         summary.total_cases for summary in regional_summaries

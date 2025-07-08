@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -10,7 +9,6 @@ class RegionalSummary:
     total_cases: int
     provinces_count: int
     last_updated: str
-    rank: Optional[int] = None
 
     def to_dict(self):
         """Convert to dictionary."""
@@ -19,7 +17,6 @@ class RegionalSummary:
             "total_cases": self.total_cases,
             "provinces_count": self.provinces_count,
             "last_updated": self.last_updated,
-            "rank": self.rank,
         }
 
 

@@ -35,7 +35,6 @@ def index():
         covid_service, regional_service = get_services()
 
         search_date = request.args.get("date", "latest")
-        sort_by = request.args.get("sort", "cases_desc")
 
         parsed_date = "latest"
         if search_date and search_date != "latest":
@@ -68,7 +67,7 @@ def index():
                     )
 
         regional_summaries = regional_service.get_regional_summary_for_date(
-            target_date=parsed_date, sort_by=sort_by
+            target_date=parsed_date
         )
 
         if not regional_summaries:
@@ -77,7 +76,7 @@ def index():
                 province_data = covid_service.fetch_all_historical_data()
                 covid_service.save_to_database(province_data, "full")
                 regional_summaries = regional_service.get_regional_summary_for_date(
-                    target_date=parsed_date, sort_by=sort_by
+                    target_date=parsed_date
                 )
             except Exception as e:
                 logger.error(f"Initial data fetch failed: {e}")
@@ -99,7 +98,6 @@ def index():
             total_regions=total_regions,
             current_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             search_date=search_date,
-            sort_by=sort_by,
             available_dates=available_dates[:30],
             historical_start=current_app.config["HISTORICAL_START_DATE"].strftime(
                 "%Y-%m-%d"

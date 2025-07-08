@@ -97,11 +97,11 @@
     </div>
 
     <div class="text-center p-6 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl border border-yellow-200">
-      <div class="text-3xl md:text-4xl font-bold text-yellow-600 mb-2">
-        {{ available_dates|length }}
+      <div id="sort-status" class="text-3xl md:text-4xl font-bold text-yellow-600 mb-2">
+        Cases ↓
       </div>
       <div class="text-sm font-semibold text-yellow-700 uppercase tracking-wide">
-        Available Dates
+        <span id="sort-label">Sort Order</span>
       </div>
     </div>
   </div>
@@ -113,57 +113,75 @@
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
         <tr>
-          {% if sort_by.startswith('cases_') %}
-          <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-            Rank
+
+          <th data-sort="name"
+            class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-200 hover:bg-white hover:bg-opacity-10 hover:scale-105 active:scale-95 mx-1">
+            <div class="flex items-center justify-between p-2">
+              <span>Region</span>
+              <svg class="w-4 h-4 ml-2 transition-all duration-200 opacity-60" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+              </svg>
+            </div>
           </th>
-          {% endif %}
-          <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-            Region
+
+          <th data-sort="cases"
+            class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-200 hover:bg-white hover:bg-opacity-10 hover:scale-105 active:scale-95 mx-1">
+            <div class="flex items-center justify-between p-2">
+              <span>Total Cases</span>
+              <svg class="w-4 h-4 ml-2 transition-all duration-200 opacity-100 rotate-180" fill="currentColor"
+                viewBox="0 0 20 20">
+                <path
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+              </svg>
+            </div>
           </th>
-          <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-            Total Cases
+
+          <th data-sort="provinces"
+            class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-200 hover:bg-white hover:bg-opacity-10 hover:scale-105 active:scale-95 mx-1">
+            <div class="flex items-center justify-between p-2">
+              <span>Provinces</span>
+              <svg class="w-4 h-4 ml-2 transition-all duration-200 opacity-60" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+              </svg>
+            </div>
           </th>
+
           <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-            Provinces
-          </th>
-          <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-            Percentage
+            <div class="flex items-center justify-between">
+              <span>Percentage</span>
+            </div>
           </th>
         </tr>
       </thead>
-      <tbody class="bg-white divide-y divide-gray-200">
+      <tbody id="data-table-body" class="bg-white divide-y divide-gray-200">
         {% for summary in regional_summaries %}
         <tr
-          class="hover:bg-gray-50 transition-colors duration-150 {% if loop.index0 % 2 == 0 %}bg-white{% else %}bg-gray-50{% endif %}">
-          {% if sort_by.startswith('cases_') %}
-          <td class="px-6 py-4 whitespace-nowrap">
-            <span
-              class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold">
-              {{ summary.rank or loop.index }}
-            </span>
-          </td>
-          {% endif %}
-          <td class="px-6 py-4 whitespace-nowrap">
+          class="transition-all duration-300 hover:bg-gray-50 {% if loop.index0 % 2 == 0 %}bg-white{% else %}bg-gray-50{% endif %}"
+          data-region="{{ summary.region_name }}" data-cases="{{ summary.total_cases }}"
+          data-provinces="{{ summary.provinces_count }}" data-updated="{{ summary.last_updated }}"
+          data-rank="{{ loop.index }}">
+          <td class="region-cell px-6 py-4 whitespace-nowrap">
             <div class="text-sm font-semibold text-gray-900">{{ summary.region_name }}</div>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap">
+          <td class="cases-cell px-6 py-4 whitespace-nowrap">
             <div class="text-sm font-bold text-gray-900">{{ "{:,}".format(summary.total_cases) }}</div>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap">
+          <td class="provinces-cell px-6 py-4 whitespace-nowrap">
             <span
               class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
               {{ summary.provinces_count }}
             </span>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap">
+          <td class="percentage-cell px-6 py-4 whitespace-nowrap">
             <div class="flex items-center">
-              <div class="text-sm font-medium text-gray-900">
+              <div class="percentage-text text-sm font-medium text-gray-900">
                 {{ "%.2f"|format((summary.total_cases / total_cases * 100) if total_cases > 0 else 0) }}%
               </div>
               <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
-                <div class="bg-blue-500 h-2 rounded-full" style="width: {{ " %.1f"|format((summary.total_cases /
-                  total_cases * 100) if total_cases> 0 else 0) }}%"></div>
+                <div class="percentage-bar bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: {{ "
+                  %.1f"|format((summary.total_cases / total_cases * 100) if total_cases> 0 else 0) }}%"></div>
               </div>
             </div>
           </td>
@@ -208,84 +226,274 @@
 {% endif %}
 
 <script>
-  
-  function exportToExcel() {
-    const searchDate = document.getElementById('search-date').value || 'latest';
-    
-  
-    const exportUrl = `/api/export/excel?date=${encodeURIComponent(searchDate)}`;
-    
-   
-    const exportButton = event.target.closest('button');
-    const originalText = exportButton.innerHTML;
-    exportButton.innerHTML = `
-      <svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
-        </path>
-      </svg>
-      Exporting...
-    `;
-    exportButton.disabled = true;
-    
-    
-    fetch(exportUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  let currentSort = {
+    column: 'cases',
+    direction: 'desc'
+  };
+
+  let originalData = [];
+  let currentData = [];
+  let totalCases = 0;
+
+  function extractTableData() {
+
+    const rows = document.querySelectorAll('#data-table-body tr[data-region]');
+    const data = [];
+
+    rows.forEach(row => {
+      const regionData = {
+        region_name: row.dataset.region,
+        total_cases: parseInt(row.dataset.cases),
+        provinces_count: parseInt(row.dataset.provinces),
+        last_updated: row.dataset.updated,
+        rank: parseInt(row.dataset.rank)
+      };
+      data.push(regionData);
+    });
+
+    return data;
+  }
+
+  function initializeFrontendSorting() {
+
+    originalData = extractTableData();
+    currentData = [...originalData];
+
+    totalCases = originalData.reduce((sum, item) => sum + item.total_cases, 0);
+
+    document.querySelectorAll('[data-sort]').forEach(header => {
+      header.addEventListener('click', function (e) {
+        e.preventDefault();
+        const column = this.dataset.sort;
+        handleFrontendSort(column);
+      });
+
+      header.title = `Click to sort by ${header.dataset.sort}`;
+    });
+
+    updateSortIndicators();
+    updateSortStatus();
+
+  }
+
+  function handleFrontendSort(column) {
+
+
+    const rows = document.querySelectorAll('tbody tr');
+    rows.forEach(row => row.classList.add('sorting'));
+
+    let newDirection;
+    if (currentSort.column === column) {
+      newDirection = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+      if (column === 'cases') {
+        newDirection = 'desc';
+      } else if (column === 'provinces') {
+        newDirection = 'desc';
+      } else {
+        newDirection = 'asc';
       }
-    })
-    .then(response => {
-      if (!response.ok) {
-      
-        if (response.headers.get('content-type')?.includes('application/json')) {
-          return response.json().then(data => {
-            throw new Error(data.error || 'Export failed');
-          });
-        }
-        throw new Error(`Export failed: HTTP ${response.status}`);
-      }
-      
-      
-      const contentDisposition = response.headers.get('content-disposition');
-      const filename = contentDisposition 
-        ? contentDisposition.split('filename=')[1]?.replace(/['"]/g, '')
-        : `covid19_export_${searchDate}.xlsx`;
-      
-      return response.blob().then(blob => ({ blob, filename }));
-    })
-    .then(({ blob, filename }) => {
-  
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.style.display = 'none';
-      
-      document.body.appendChild(link);
-      link.click();
-      
-    
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(link);
-      
-     
-      showNotification('Excel file downloaded successfully!', 'success');
-    })
-    .catch(error => {
-      console.error('Export error:', error);
-      showNotification(`Export failed: ${error.message}`, 'error');
-    })
-    .finally(() => {
-  
+    }
+
+    currentSort = { column, direction: newDirection };
+
+    currentData = sortDataArray([...originalData], column, newDirection);
+
+    setTimeout(() => {
+      renderSortedTable(currentData);
+      updateSortIndicators();
+      updateSortStatus();
+
       setTimeout(() => {
-        exportButton.innerHTML = originalText;
-        exportButton.disabled = false;
-      }, 1000);
+        document.querySelectorAll('tbody tr').forEach(row => {
+          row.classList.remove('sorting');
+        });
+      }, 300);
+    }, 200);
+  }
+
+  function sortDataArray(data, column, direction) {
+    return data.sort((a, b) => {
+      let valueA, valueB;
+
+      if (column === 'cases') {
+        valueA = a.total_cases;
+        valueB = b.total_cases;
+      } else if (column === 'name') {
+        valueA = a.region_name.toLowerCase();
+        valueB = b.region_name.toLowerCase();
+      } else if (column === 'provinces') {
+        valueA = a.provinces_count;
+        valueB = b.provinces_count;
+      } else {
+        return 0;
+      }
+
+      if (direction === 'asc') {
+        return valueA > valueB ? 1 : valueA < valueB ? -1 : 0;
+      } else {
+        return valueA < valueB ? 1 : valueA > valueB ? -1 : 0;
+      }
     });
   }
-  
 
-  
+  function renderSortedTable(data) {
+    const tbody = document.getElementById('data-table-body');
+
+    tbody.innerHTML = data.map((item, index) => {
+      const percentage = totalCases > 0 ? (item.total_cases / totalCases * 100) : 0;
+      const isEven = index % 2 === 0;
+
+      return `
+      <tr class="slide-in transition-all duration-300 hover:bg-gray-50 ${isEven ? 'bg-white' : 'bg-gray-50'}" 
+          style="animation-delay: ${index * 30}ms"
+          data-region="${item.region_name}" 
+          data-cases="${item.total_cases}" 
+          data-provinces="${item.provinces_count}"
+          data-updated="${item.last_updated}"
+          data-rank="${index + 1}">
+        <td class="region-cell px-6 py-4 whitespace-nowrap">
+          <div class="text-sm font-semibold text-gray-900">${item.region_name}</div>
+        </td>
+        <td class="cases-cell px-6 py-4 whitespace-nowrap">
+          <div class="text-sm font-bold text-gray-900">${item.total_cases.toLocaleString()}</div>
+        </td>
+        <td class="provinces-cell px-6 py-4 whitespace-nowrap">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+            ${item.provinces_count}
+          </span>
+        </td>
+        <td class="percentage-cell px-6 py-4 whitespace-nowrap">
+          <div class="flex items-center">
+            <div class="percentage-text text-sm font-medium text-gray-900">
+              ${percentage.toFixed(2)}%
+            </div>
+            <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
+              <div class="percentage-bar bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                  style="width: ${percentage.toFixed(1)}%"></div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+    }).join('');
+  }
+
+  function updateSortIndicators() {
+
+    document.querySelectorAll('[data-sort] svg').forEach(indicator => {
+      indicator.classList.remove('opacity-100', 'rotate-180');
+      indicator.classList.add('opacity-60');
+    });
+
+
+    const activeHeader = document.querySelector(`[data-sort="${currentSort.column}"]`);
+    if (activeHeader) {
+      const indicator = activeHeader.querySelector('svg');
+      indicator.classList.remove('opacity-60');
+      indicator.classList.add('opacity-100');
+      if (currentSort.direction === 'desc') {
+        indicator.classList.add('rotate-180');
+      }
+    }
+  }
+
+  function updateSortStatus() {
+    const sortStatus = document.getElementById('sort-status');
+    const sortLabel = document.getElementById('sort-label');
+
+    if (sortStatus && sortLabel) {
+      let columnName;
+      if (currentSort.column === 'cases') {
+        columnName = 'Cases';
+      } else if (currentSort.column === 'name') {
+        columnName = 'Region';
+      } else if (currentSort.column === 'provinces') {
+        columnName = 'Provinces';
+      } else {
+        columnName = 'Data';
+      }
+
+      const directionSymbol = currentSort.direction === 'desc' ? '↓' : '↑';
+
+      sortStatus.textContent = `${columnName} ${directionSymbol}`;
+      sortLabel.textContent = 'Sort Order';
+    }
+  }
+
+  function exportToExcel() {
+    const searchDate = document.getElementById('search-date')?.value || 'latest';
+
+    const exportUrl = `/api/export/excel?date=${encodeURIComponent(searchDate)}`;
+
+    const exportButton = event.target.closest('button');
+    const originalText = exportButton.innerHTML;
+
+    exportButton.innerHTML = `
+    <svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+      </path>
+    </svg>
+    Exporting...
+  `;
+    exportButton.disabled = true;
+
+    fetch(exportUrl)
+      .then(response => {
+        if (!response.ok) {
+          if (response.headers.get('content-type')?.includes('application/json')) {
+            return response.json().then(data => {
+              throw new Error(data.error || 'Export failed');
+            });
+          }
+          throw new Error(`Export failed: HTTP ${response.status}`);
+        }
+
+        const contentDisposition = response.headers.get('content-disposition');
+        const filename = contentDisposition
+          ? contentDisposition.split('filename=')[1]?.replace(/['"]/g, '')
+          : `covid19_export_${searchDate}.xlsx`;
+
+        return response.blob().then(blob => ({ blob, filename }));
+      })
+      .then(({ blob, filename }) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+
+        document.body.appendChild(link);
+        link.click();
+
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+
+        console.log('✅ Excel file downloaded successfully!');
+      })
+      .catch(error => {
+        console.error('Export error:', error);
+        console.log('❌ Export failed:', error.message);
+      })
+      .finally(() => {
+        setTimeout(() => {
+          exportButton.innerHTML = originalText;
+          exportButton.disabled = false;
+        }, 1000);
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(() => {
+      const table = document.getElementById('data-table-body');
+      if (table && table.children.length > 0) {
+        initializeFrontendSorting();
+      } else {
+        console.warn('⚠️ Table not found or empty, sorting not initialized');
+      }
+    }, 100);
+  });
 </script>
+
 {% endblock %}

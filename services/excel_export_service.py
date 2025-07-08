@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class ExcelExportService:
-    """Service class for Excel export functionality."""
+    """Simplified service class for Excel export functionality."""
 
     def __init__(self):
         self.regional_service = RegionalDataService()
@@ -21,6 +21,7 @@ class ExcelExportService:
     def create_excel_export(self, parsed_date: str) -> Tuple[BytesIO, str]:
         """
         Create Excel export for regional COVID-19 data.
+        Data is always exported in default order (cases desc, name asc).
 
         Args:
             parsed_date: Date to export data for ('latest' or date string)
@@ -33,7 +34,7 @@ class ExcelExportService:
         """
 
         regional_summaries = self.regional_service.get_regional_summary_for_date(
-            target_date=parsed_date, sort_by="cases_desc"
+            target_date=parsed_date
         )
 
         if not regional_summaries:
@@ -138,6 +139,8 @@ class ExcelExportService:
         ws[f"B{metadata_row + 1}"] = date_str
         ws[f"A{metadata_row + 2}"] = "Total Regions:"
         ws[f"B{metadata_row + 2}"] = total_regions
+        ws[f"A{metadata_row + 3}"] = "Sort Order:"
+        ws[f"B{metadata_row + 3}"] = "Cases (High to Low), Region (A-Z)"
 
     def _adjust_column_widths(self, ws):
         """Auto-adjust column widths based on content."""
