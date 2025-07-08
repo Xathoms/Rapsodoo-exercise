@@ -45,6 +45,23 @@
           {% endif %}
         </div>
       </div>
+
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
+          📊 Export
+        </label>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <button type="button" onclick="exportToExcel()"
+            class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:-translate-y-1 transition-all duration-200 flex items-center justify-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+              </path>
+            </svg>
+            Excel
+          </button>
+        </div>
+      </div>
     </div>
   </form>
 </div>
@@ -75,7 +92,7 @@
         {{ regional_summaries|length > 0 and regional_summaries[0].last_updated.split(' ')[0] or 'N/A' }}
       </div>
       <div class="text-sm font-semibold text-purple-700 uppercase tracking-wide">
-        Data Date
+        Current Date
       </div>
     </div>
 
@@ -189,4 +206,86 @@
   </div>
 </div>
 {% endif %}
+
+<script>
+  
+  function exportToExcel() {
+    const searchDate = document.getElementById('search-date').value || 'latest';
+    
+  
+    const exportUrl = `/api/export/excel?date=${encodeURIComponent(searchDate)}`;
+    
+   
+    const exportButton = event.target.closest('button');
+    const originalText = exportButton.innerHTML;
+    exportButton.innerHTML = `
+      <svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+        </path>
+      </svg>
+      Exporting...
+    `;
+    exportButton.disabled = true;
+    
+    
+    fetch(exportUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+      
+        if (response.headers.get('content-type')?.includes('application/json')) {
+          return response.json().then(data => {
+            throw new Error(data.error || 'Export failed');
+          });
+        }
+        throw new Error(`Export failed: HTTP ${response.status}`);
+      }
+      
+      
+      const contentDisposition = response.headers.get('content-disposition');
+      const filename = contentDisposition 
+        ? contentDisposition.split('filename=')[1]?.replace(/['"]/g, '')
+        : `covid19_export_${searchDate}.xlsx`;
+      
+      return response.blob().then(blob => ({ blob, filename }));
+    })
+    .then(({ blob, filename }) => {
+  
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      
+    
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      
+     
+      showNotification('Excel file downloaded successfully!', 'success');
+    })
+    .catch(error => {
+      console.error('Export error:', error);
+      showNotification(`Export failed: ${error.message}`, 'error');
+    })
+    .finally(() => {
+  
+      setTimeout(() => {
+        exportButton.innerHTML = originalText;
+        exportButton.disabled = false;
+      }, 1000);
+    });
+  }
+  
+
+  
+</script>
 {% endblock %}
