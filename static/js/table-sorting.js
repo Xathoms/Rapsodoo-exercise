@@ -156,7 +156,7 @@ function renderSortedTable(data) {
 function updateSortIndicators() {
   document.querySelectorAll('[data-sort] svg').forEach((indicator) => {
     indicator.classList.remove('opacity-100', 'rotate-180');
-    indicator.classList.add('opacity-60');
+    indicator.classList.add('opacity-30');
   });
 
   const activeHeader = document.querySelector(
@@ -164,9 +164,9 @@ function updateSortIndicators() {
   );
   if (activeHeader) {
     const indicator = activeHeader.querySelector('svg');
-    indicator.classList.remove('opacity-60');
+    indicator.classList.remove('opacity-30');
     indicator.classList.add('opacity-100');
-    if (currentSort.direction === 'desc') {
+    if (currentSort.direction === 'asc') {
       indicator.classList.add('rotate-180');
     }
   }
