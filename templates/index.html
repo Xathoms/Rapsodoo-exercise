@@ -4,13 +4,13 @@
 <div
   class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-8 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
   <form method="GET" onsubmit="return validateSearchForm()">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-      <div class="space-y-2">
+    <div class="flex justify-evenly flex-col lg:flex-row gap-4 lg:items-end">
+      <div class=" space-y-2">
         <label for="search-date" class="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
           🗓️ Search by Date
         </label>
         <input type="date" id="search-date" name="date"
-          class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+          class="w-full h-12 px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
           value="{{ search_date if search_date != 'latest' else '' }}" min="{{ historical_start }}"
           max="{{ today().strftime('%Y-%m-%d') }}" placeholder="YYYY-MM-DD or leave empty for latest">
         <p class="text-xs text-gray-500 mt-1">
@@ -18,49 +18,58 @@
         </p>
       </div>
 
-      <div class="space-y-2">
-        <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
-          ⚡ Actions
-        </label>
-        <div class="flex flex-col sm:flex-row gap-2">
-          <button type="submit"
-            class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:-translate-y-1 transition-all duration-200 flex items-center justify-center">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-            Search
-          </button>
+      <div class="flex flex-col sm:flex-row gap-3 lg:flex-shrink-0 lg:mb-6">
 
-          {% if search_date != 'latest' %}
-          <a href="/"
-            class="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:-translate-y-1 transition-all duration-200 flex items-center justify-center">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
-              </path>
-            </svg>
-            Latest
-          </a>
-          {% endif %}
-        </div>
+        <button type="submit"
+          class="h-12 px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg hover:-translate-y-1 transition-all duration-200 flex items-center justify-center min-w-[160px]">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          Search
+        </button>
+
+        {% if search_date != 'latest' %}
+        <a href="/"
+          class="h-12 px-8 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold hover:shadow-lg hover:-translate-y-1 transition-all duration-200 flex items-center justify-center min-w-[160px]">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+            </path>
+          </svg>
+          Latest
+        </a>
+        {% endif %}
+
+        <button type="button" onclick="exportToExcel()"
+          class="h-12 px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:shadow-lg hover:-translate-y-1 transition-all duration-200 flex items-center justify-center min-w-[160px]">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+            </path>
+          </svg>
+          Excel
+        </button>
+
       </div>
+    </div>
 
-      <div class="space-y-2">
-        <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide">
-          📊 Export
-        </label>
-        <div class="flex flex-col sm:flex-row gap-2">
-          <button type="button" onclick="exportToExcel()"
-            class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:-translate-y-1 transition-all duration-200 flex items-center justify-center">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-              </path>
-            </svg>
-            Excel
-          </button>
-        </div>
+    <div class="mt-4 pt-4 border-t border-gray-100 lg:hidden">
+      <div class="flex flex-wrap gap-2 justify-center">
+        <button type="button" onclick="document.getElementById('search-date').value=''; this.form.submit();"
+          class="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
+          Latest Data
+        </button>
+        <button type="button"
+          onclick="document.getElementById('search-date').valueAsDate = new Date(Date.now() - 86400000); this.form.submit();"
+          class="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
+          Yesterday
+        </button>
+        <button type="button"
+          onclick="document.getElementById('search-date').valueAsDate = new Date(Date.now() - 7*86400000); this.form.submit();"
+          class="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors">
+          Last Week
+        </button>
       </div>
     </div>
   </form>
@@ -114,35 +123,38 @@
       <thead class="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
         <tr>
           <th data-sort="name"
-              class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-200 hover:bg-white hover:bg-opacity-10 hover:scale-105 active:scale-95 mx-1">
+            class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-200 hover:bg-white hover:bg-opacity-10 hover:scale-105 active:scale-95 mx-1">
             <div class="flex items-center justify-between p-2">
               <span>Region</span>
               <svg class="w-4 h-4 ml-2 transition-all duration-200 opacity-30" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                <path
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
               </svg>
             </div>
           </th>
-      
+
           <th data-sort="cases"
-              class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-200 hover:bg-white hover:bg-opacity-10 hover:scale-105 active:scale-95 mx-1">
+            class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-200 hover:bg-white hover:bg-opacity-10 hover:scale-105 active:scale-95 mx-1">
             <div class="flex items-center justify-between p-2">
               <span>Total Cases</span>
               <svg class="w-4 h-4 ml-2 transition-all duration-200 opacity-30" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                <path
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
               </svg>
             </div>
           </th>
-      
+
           <th data-sort="provinces"
-              class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-200 hover:bg-white hover:bg-opacity-10 hover:scale-105 active:scale-95 mx-1">
+            class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider cursor-pointer select-none transition-all duration-200 hover:bg-white hover:bg-opacity-10 hover:scale-105 active:scale-95 mx-1">
             <div class="flex items-center justify-between p-2">
               <span>Provinces</span>
               <svg class="w-4 h-4 ml-2 transition-all duration-200 opacity-30" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                <path
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
               </svg>
             </div>
           </th>
-      
+
           <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
             <div class="flex items-center justify-between">
               <span>Percentage</span>
