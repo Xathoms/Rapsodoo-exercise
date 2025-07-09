@@ -31,37 +31,54 @@ class CacheService:
 
     def should_refresh_data(self, cache_minutes: int = 60) -> Tuple[bool, str]:
         """
-        Determine if data should be refreshed and what type of refresh to perform.
-
-        Evaluates cache age and decides between incremental, full, or no refresh
-        based on configured thresholds and data availability.
+        Determine if data should be refreshed with correct cache type logic.
 
         Args:
-            cache_minutes (int): Cache validity period in minutes. Defaults to 60.
+            cache_minutes (int): Cache validity period in minutes.
 
         Returns:
             Tuple[bool, str]: (should_refresh, refresh_type)
-            refresh_type can be: 'none', 'incremental', 'full'
-
         """
         try:
+            now = datetime.now(timezone.utc)
+
             full_cache = DataCache.query.filter_by(cache_type="full").first()
+            latest_cache = DataCache.query.filter_by(cache_type="latest").first()
 
             if not full_cache:
+                logger.info("No full cache found, performing full refresh")
                 return True, "full"
 
-            now = datetime.now(timezone.utc)
-            last_fetch = full_cache.last_fetch_time
-            if last_fetch.tzinfo is None:
-                last_fetch = last_fetch.replace(tzinfo=timezone.utc)
-            full_cache_age = now - last_fetch
+            full_last_fetch = full_cache.last_fetch_time
+            if full_last_fetch.tzinfo is None:
+                full_last_fetch = full_last_fetch.replace(tzinfo=timezone.utc)
+
+            full_cache_age = now - full_last_fetch
 
             if full_cache_age.total_seconds() > (24 * 60 * 60):
+                logger.info(
+                    "Full cache is older than 24 hours, performing full refresh"
+                )
                 return True, "full"
 
-            if full_cache_age.total_seconds() > (cache_minutes * 60):
-                return True, "incremental"
+            if latest_cache:
+                latest_last_fetch = latest_cache.last_fetch_time
+                if latest_last_fetch.tzinfo is None:
+                    latest_last_fetch = latest_last_fetch.replace(tzinfo=timezone.utc)
 
+                latest_cache_age = now - latest_last_fetch
+
+                if latest_cache_age.total_seconds() > (cache_minutes * 60):
+                    logger.info(
+                        f"Latest cache is older than {cache_minutes} minutes, performing incremental refresh"
+                    )
+                    return True, "incremental"
+            else:
+                if full_cache_age.total_seconds() > (cache_minutes * 60):
+                    logger.info("No latest cache found, performing incremental refresh")
+                    return True, "incremental"
+
+            logger.info("Cache is fresh, no refresh needed")
             return False, "none"
 
         except Exception as e:
@@ -121,7 +138,6 @@ class CacheService:
                 - 'fetch_full': Fetch complete historical data
                 - 'date_missing': Date is known to be unavailable
         """
-
         if target_date == "latest":
             should_refresh, refresh_type = self.should_refresh_data()
             if not should_refresh:
@@ -150,7 +166,8 @@ class CacheService:
             available_dates = self._get_available_date_range()
             if available_dates:
                 earliest_date, latest_date = available_dates
-                earliest_date = datetime.strptime(earliest_date, "%Y-%m-%d").date()
+                if isinstance(earliest_date, str):
+                    earliest_date = datetime.strptime(earliest_date, "%Y-%m-%d").date()
                 if target_date < earliest_date:
                     self.mark_date_as_missing(target_date)
                     return "date_missing"
@@ -271,11 +288,30 @@ class RegionalDataService:
                 if refresh_type == "incremental":
                     logger.info("Performing incremental data refresh for latest data")
                     latest_data = covid_service.fetch_latest_data()
-                    covid_service.save_to_database(latest_data, "latest")
+
+                    if latest_data:
+                        saved_count, latest_timestamp = covid_service.save_to_database(
+                            latest_data, "latest"
+                        )
+
+                        if saved_count > 0:
+                            logger.info(f"Saved {saved_count} new records")
+                        else:
+                            logger.info("No new data to save (already up to date)")
+                    else:
+                        logger.warning("No data returned from incremental fetch")
+
                 elif refresh_type == "full":
                     logger.info("Performing full historical data refresh")
                     all_data = covid_service.fetch_all_historical_data()
-                    covid_service.save_to_database(all_data, "full")
+
+                    if all_data:
+                        saved_count, latest_timestamp = covid_service.save_to_database(
+                            all_data, "full"
+                        )
+                        logger.info(f"Full refresh completed: {saved_count} records")
+                    else:
+                        logger.warning("No data returned from full fetch")
 
                 data = self._get_from_cache(target_date)
                 if data:
@@ -291,6 +327,10 @@ class RegionalDataService:
                 if data:
                     return data, "Using cached data (refresh failed)"
                 return [], f"Data unavailable: {str(e)}"
+
+        data = self._get_from_cache(target_date)
+        if data:
+            return data, "Using cached data (no refresh service)"
 
         return [], "No data available"
 
@@ -314,12 +354,20 @@ class RegionalDataService:
                 latest_timestamp = db.session.query(
                     func.max(CovidDataRecord.data_timestamp)
                 ).scalar()
+
                 if not latest_timestamp:
+                    logger.warning("No data found in database")
                     return []
+
                 query_timestamp = latest_timestamp
+
             else:
                 if isinstance(target_date, str):
-                    target_date = datetime.strptime(target_date, "%Y-%m-%d").date()
+                    try:
+                        target_date = datetime.strptime(target_date, "%Y-%m-%d").date()
+                    except ValueError:
+                        logger.error(f"Invalid date format: {target_date}")
+                        return []
 
                 query_timestamp = (
                     db.session.query(CovidDataRecord.data_timestamp)
@@ -328,7 +376,9 @@ class RegionalDataService:
                 )
 
                 if not query_timestamp:
+                    logger.info(f"No data found for date: {target_date}")
                     return []
+
                 query_timestamp = query_timestamp[0]
 
             query = (
@@ -366,3 +416,83 @@ class RegionalDataService:
         except Exception as e:
             logger.error(f"Failed to retrieve data from cache: {e}")
             return []
+
+    def get_regional_summary_for_date(
+        self, target_date: Union[date, str] = "latest", limit: Optional[int] = None
+    ) -> List[RegionalSummary]:
+        """
+        Get regional summary for a specific date with smart caching.
+        """
+
+        summaries, status = self.get_regional_summary_smart(target_date)
+
+        if limit and limit > 0:
+            summaries = summaries[:limit]
+
+        logger.info(
+            f"Retrieved {len(summaries)} regional summaries for {target_date} - {status}"
+        )
+        return summaries
+
+    def get_region_statistics(
+        self, target_date: Union[date, str] = "latest"
+    ) -> Optional[dict]:
+        """Get comprehensive statistics for regions."""
+        summaries = self.get_regional_summary_for_date(target_date)
+
+        if not summaries:
+            return None
+
+        total_cases = sum(summary.total_cases for summary in summaries)
+        total_regions = len(summaries)
+
+        if total_regions == 0:
+            return None
+
+        average_cases = total_cases / total_regions
+        max_region = max(summaries, key=lambda x: x.total_cases)
+        min_region = min(summaries, key=lambda x: x.total_cases)
+
+        return {
+            "total_cases": total_cases,
+            "total_regions": total_regions,
+            "average_cases_per_region": round(average_cases, 2),
+            "max_cases_region": {
+                "name": max_region.region_name,
+                "cases": max_region.total_cases,
+            },
+            "min_cases_region": {
+                "name": min_region.region_name,
+                "cases": min_region.total_cases,
+            },
+        }
+
+    def get_available_dates(self, limit: Optional[int] = None) -> List[date]:
+        """Get list of available dates in the database."""
+        try:
+            query = db.session.query(
+                func.distinct(func.date(CovidDataRecord.data_timestamp))
+            ).order_by(func.date(CovidDataRecord.data_timestamp).desc())
+
+            if limit:
+                query = query.limit(limit)
+
+            dates = query.all()
+            return [d[0] for d in dates]
+        except Exception as e:
+            logger.error(f"Failed to get available dates: {e}")
+            return []
+
+    def get_cache_info(self) -> dict:
+        """Get information about current cache status."""
+        try:
+            cache_records = DataCache.query.all()
+            cache_info = {}
+
+            for record in cache_records:
+                cache_info[record.cache_type] = record.to_dict()
+
+            return cache_info
+        except Exception as e:
+            logger.error(f"Failed to get cache info: {e}")
+            return {}

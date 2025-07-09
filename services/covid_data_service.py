@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Tuple, Union
 
 import requests
@@ -214,65 +214,126 @@ class CovidDataService:
 
         try:
             with db.session.no_autoflush:
+                saved_count = 0
+                latest_timestamp = None
+
                 if cache_type == "full":
                     logger.info("Clearing existing data for full refresh...")
                     db.session.query(CovidDataRecord).delete()
                     db.session.commit()
 
-                saved_count = 0
-                latest_timestamp = None
+                    records_by_timestamp = {}
+                    for province in province_data:
+                        try:
+                            timestamp = datetime.fromisoformat(
+                                province.data.replace("T", " ").replace("Z", "")
+                            )
+                            if latest_timestamp is None or timestamp > latest_timestamp:
+                                latest_timestamp = timestamp
 
-                records_by_timestamp = {}
+                            key = f"{timestamp.isoformat()}_{province.codice_regione}_{province.codice_provincia}"
+                            if key not in records_by_timestamp:
+                                records_by_timestamp[key] = province
+                        except Exception as e:
+                            logger.warning(f"Skipping invalid province record: {e}")
+                            continue
 
-                for province in province_data:
-                    try:
-                        timestamp = datetime.fromisoformat(
-                            province.data.replace("T", " ").replace("Z", "")
-                        )
-
-                        if latest_timestamp is None or timestamp > latest_timestamp:
-                            latest_timestamp = timestamp
-
-                        key = f"{timestamp.isoformat()}_{province.codice_regione}_{province.codice_provincia}"
-
-                        if key not in records_by_timestamp:
-                            records_by_timestamp[key] = province
-
-                    except Exception as e:
-                        logger.warning(f"Skipping invalid province record: {e}")
-                        continue
-
-                bulk_data = []
-                for province in records_by_timestamp.values():
-                    try:
-                        timestamp = datetime.fromisoformat(
-                            province.data.replace("T", " ").replace("Z", "")
-                        )
-
-                        bulk_data.append(
-                            {
-                                "data_timestamp": timestamp,
-                                "stato": province.stato,
-                                "codice_regione": province.codice_regione,
-                                "denominazione_regione": province.denominazione_regione,
-                                "codice_provincia": province.codice_provincia,
-                                "denominazione_provincia": province.denominazione_provincia,
-                                "sigla_provincia": province.sigla_provincia,
-                                "lat": province.lat,
-                                "long": province.long,
-                                "totale_casi": province.totale_casi,
-                                "note": province.note,
-                                "codice_nuts_1": province.codice_nuts_1,
-                                "codice_nuts_2": province.codice_nuts_2,
-                                "codice_nuts_3": province.codice_nuts_3,
-                                "created_at": datetime.now(timezone.utc),
-                            }
-                        )
+                    bulk_data = []
+                    for province in records_by_timestamp.values():
+                        bulk_data.append(self._prepare_record_for_insert(province))
                         saved_count += 1
 
-                    except Exception as e:
-                        logger.warning(f"Failed to prepare record for bulk insert: {e}")
-                        continue
+                elif cache_type == "latest":
+                    logger.info("Performing incremental update for latest data...")
+
+                    existing_timestamps = set()
+                    if province_data:
+                        new_timestamps = []
+                        for province in province_data:
+                            try:
+                                timestamp = datetime.fromisoformat(
+                                    province.data.replace("T", " ").replace("Z", "")
+                                )
+                                new_timestamps.append(timestamp)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Invalid timestamp in province data: {e}"
+                                )
+                                continue
+
+                        if new_timestamps:
+                            latest_new_timestamp = max(new_timestamps)
+
+                            existing_records = (
+                                db.session.query(CovidDataRecord.data_timestamp)
+                                .filter(
+                                    CovidDataRecord.data_timestamp
+                                    == latest_new_timestamp
+                                )
+                                .all()
+                            )
+
+                            existing_timestamps = {
+                                record[0] for record in existing_records
+                            }
+
+                            if latest_new_timestamp in existing_timestamps:
+                                logger.info(
+                                    f"Latest data for {latest_new_timestamp} already exists, skipping insertion"
+                                )
+
+                                cache_record = DataCache.query.filter_by(
+                                    cache_type=cache_type
+                                ).first()
+                                if cache_record:
+                                    cache_record.last_fetch_time = datetime.now(
+                                        timezone.utc
+                                    )
+                                    cache_record.last_data_timestamp = (
+                                        latest_new_timestamp
+                                    )
+                                    db.session.commit()
+
+                                return 0, latest_new_timestamp
+
+                    records_by_timestamp = {}
+                    for province in province_data:
+                        try:
+                            timestamp = datetime.fromisoformat(
+                                province.data.replace("T", " ").replace("Z", "")
+                            )
+
+                            if timestamp in existing_timestamps:
+                                logger.debug(
+                                    f"Skipping duplicate timestamp: {timestamp}"
+                                )
+                                continue
+
+                            if latest_timestamp is None or timestamp > latest_timestamp:
+                                latest_timestamp = timestamp
+
+                            key = f"{timestamp.isoformat()}_{province.codice_regione}_{province.codice_provincia}"
+                            if key not in records_by_timestamp:
+                                records_by_timestamp[key] = province
+                        except Exception as e:
+                            logger.warning(f"Skipping invalid province record: {e}")
+                            continue
+
+                    if records_by_timestamp:
+                        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+                        old_records = (
+                            db.session.query(CovidDataRecord)
+                            .filter(CovidDataRecord.data_timestamp < cutoff_date)
+                            .delete()
+                        )
+
+                        if old_records > 0:
+                            logger.info(f"Cleaned up {old_records} old records")
+
+                    bulk_data = []
+                    for province in records_by_timestamp.values():
+                        bulk_data.append(self._prepare_record_for_insert(province))
+                        saved_count += 1
 
                 if bulk_data:
                     db.session.bulk_insert_mappings(CovidDataRecord, bulk_data)
@@ -323,4 +384,34 @@ class CovidDataService:
         except Exception as e:
             db.session.rollback()
             logger.error(f"Database save failed: {e}")
+            raise
+
+    def _prepare_record_for_insert(self, province: ProvinceData) -> dict:
+        """
+        Helper method to prepare a province record for database insertion.
+        """
+        try:
+            timestamp = datetime.fromisoformat(
+                province.data.replace("T", " ").replace("Z", "")
+            )
+
+            return {
+                "data_timestamp": timestamp,
+                "stato": province.stato,
+                "codice_regione": province.codice_regione,
+                "denominazione_regione": province.denominazione_regione,
+                "codice_provincia": province.codice_provincia,
+                "denominazione_provincia": province.denominazione_provincia,
+                "sigla_provincia": province.sigla_provincia,
+                "lat": province.lat,
+                "long": province.long,
+                "totale_casi": province.totale_casi,
+                "note": province.note,
+                "codice_nuts_1": province.codice_nuts_1,
+                "codice_nuts_2": province.codice_nuts_2,
+                "codice_nuts_3": province.codice_nuts_3,
+                "created_at": datetime.now(timezone.utc),
+            }
+        except Exception as e:
+            logger.warning(f"Failed to prepare record for bulk insert: {e}")
             raise
