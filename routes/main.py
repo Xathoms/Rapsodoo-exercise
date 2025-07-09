@@ -1,95 +1,80 @@
 import logging
 from datetime import datetime
 
-from flask import Blueprint, current_app, flash, render_template, request
+from flask import Blueprint, current_app, render_template, request
+from sqlalchemy import func
 
+from database import db
+from models.covid_data import CovidDataRecord
 from services import CovidDataService, RegionalDataService
 from utils import parse_date_input
 
 logger = logging.getLogger(__name__)
 main_bp = Blueprint("main", __name__)
+regional_service = RegionalDataService()
 
 
 def get_covid_service():
-    """Get COVID service with proper timeout from config."""
+    """
+    Get COVID service instance with proper timeout from application config.
+
+    Returns:
+        CovidDataService: Configured service instance with request timeout
+    """
     timeout = current_app.config.get("REQUEST_TIMEOUT", 30)
     return CovidDataService(timeout=timeout)
 
 
-covid_service = None
-regional_service = RegionalDataService()
-
-
-def get_services():
-    """Initialize services if needed."""
-    global covid_service
-    if covid_service is None:
-        covid_service = get_covid_service()
-    return covid_service, regional_service
-
-
 @main_bp.route("/")
 def index():
-    """Main page displaying regional COVID-19 statistics."""
-    try:
-        covid_service, regional_service = get_services()
+    """
+    Main page displaying regional COVID-19 statistics with intelligent caching.
 
+    This endpoint serves the primary dashboard showing regional COVID-19 case data.
+    It implements smart caching strategies to minimize API calls while ensuring
+    data freshness, and provides comprehensive error handling with user feedback.
+
+    Returns:
+        flask.Response: Rendered HTML template with regional statistics or error page
+    """
+    try:
+        covid_service = get_covid_service()
         search_date = request.args.get("date", "latest")
 
         parsed_date = "latest"
         if search_date and search_date != "latest":
             parsed_date = parse_date_input(search_date)
             if parsed_date is None:
-                flash(
-                    f"Invalid date format: {search_date}. Please use YYYY-MM-DD format.",
-                    "error",
-                )
                 parsed_date = "latest"
 
-        if regional_service.should_refresh_data(
-            current_app.config["DATA_CACHE_MINUTES"]
-        ):
-            try:
-                logger.info("Refreshing COVID-19 data...")
-                province_data = covid_service.fetch_all_historical_data()
-                covid_service.save_to_database(province_data, "full")
-            except Exception as e:
-                logger.error(f"Failed to refresh data: {e}")
-
-                try:
-                    logger.info("Attempting to fetch latest data as fallback...")
-                    latest_data = covid_service.fetch_latest_data()
-                    covid_service.save_to_database(latest_data, "latest")
-                except Exception as e2:
-                    logger.error(f"Fallback also failed: {e2}")
-                    flash(
-                        "Unable to fetch latest data. Showing cached data.", "warning"
-                    )
-
-        regional_summaries = regional_service.get_regional_summary_for_date(
-            target_date=parsed_date
+        regional_summaries, status_message = (
+            regional_service.get_regional_summary_smart(
+                target_date=parsed_date, covid_service=covid_service
+            )
         )
 
+        logger.info(f"Data retrieval status: {status_message}")
+
         if not regional_summaries:
-            try:
-                logger.info("No data found, attempting initial fetch")
-                province_data = covid_service.fetch_all_historical_data()
-                covid_service.save_to_database(province_data, "full")
-                regional_summaries = regional_service.get_regional_summary_for_date(
-                    target_date=parsed_date
-                )
-            except Exception as e:
-                logger.error(f"Initial data fetch failed: {e}")
-                flash("Unable to fetch COVID-19 data. Please try again later.", "error")
-                return render_template(
-                    "error.html",
-                    error_message="Unable to fetch COVID-19 data. Please try again later.",
-                ), 503
+            available_dates = _get_available_dates_sample()
+            return render_template(
+                "index.html",
+                regional_summaries=[],
+                total_cases=0,
+                total_regions=0,
+                current_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                search_date=search_date,
+                available_dates=available_dates,
+                historical_start=current_app.config["HISTORICAL_START_DATE"].strftime(
+                    "%Y-%m-%d"
+                ),
+                status_message=status_message,
+            )
 
         total_cases = sum(summary.total_cases for summary in regional_summaries)
         total_regions = len(regional_summaries)
 
-        available_dates = regional_service.get_available_dates()
+        available_dates = _get_available_dates_sample()
 
         return render_template(
             "index.html",
@@ -98,29 +83,56 @@ def index():
             total_regions=total_regions,
             current_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             search_date=search_date,
-            available_dates=available_dates[:30],
+            available_dates=available_dates,
             historical_start=current_app.config["HISTORICAL_START_DATE"].strftime(
                 "%Y-%m-%d"
             ),
+            status_message=status_message,
         )
 
     except Exception as e:
-        logger.error(f"Application error: {e}")
-        flash("An internal error occurred. Please try again later.", "error")
+        logger.error(f"Application error in main route: {e}")
         return render_template(
             "error.html",
             error_message="An internal error occurred. Please try again later.",
         ), 500
 
 
+def _get_available_dates_sample(limit: int = 30) -> list:
+    """
+    Get a sample of available dates from the database for UI guidance.
+
+    This helper function retrieves a limited set of available dates to show
+    users what data is actually available, helping them make informed date selections.
+
+    Args:
+        limit (int): Maximum number of dates to return. Defaults to 30.
+
+    Returns:
+        list: List of date objects representing available data dates,
+            sorted in descending order (most recent first)
+    """
+    try:
+        dates = (
+            db.session.query(func.distinct(func.date(CovidDataRecord.data_timestamp)))
+            .order_by(func.date(CovidDataRecord.data_timestamp).desc())
+            .limit(limit)
+            .all()
+        )
+        return [d[0] for d in dates]
+    except Exception as e:
+        logger.error(f"Failed to get available dates sample: {e}")
+        return []
+
+
 @main_bp.errorhandler(404)
 def not_found(error):
-    """404 error handler."""
+    """Handle 404 Not Found errors with user-friendly error page."""
     return render_template("error.html", error_message="Page not found."), 404
 
 
 @main_bp.errorhandler(500)
 def internal_error(error):
-    """500 error handler."""
+    """Handle 500 Internal Server errors with logging and generic user message."""
     logger.error(f"Internal server error: {error}")
     return render_template("error.html", error_message="Internal server error."), 500
