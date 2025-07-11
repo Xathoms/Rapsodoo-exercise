@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import date, datetime
 
-from flask import Flask
+from flask import Flask, render_template
 
 from config import config
 from database import db
@@ -42,11 +42,64 @@ def create_app(config_name=None):
         """Make current date available in templates."""
         return date.today()
 
+    register_error_handlers(app)
+
     with app.app_context():
         create_database_tables()
 
     logger.info(f"COVID-19 Italy application created with config: {config_name}")
     return app
+
+
+def register_error_handlers(app):
+    """Register application-level error handlers."""
+
+    @app.errorhandler(404)
+    def handle_404(error):
+        """Handle 404 Not Found errors."""
+        logger.warning(
+            f"404 error: {error} - URL: {error.description if hasattr(error, 'description') else 'Unknown'}"
+        )
+        return render_template(
+            "error.html",
+            error_message="The page you're looking for doesn't exist.",
+            error_code="404",
+        ), 404
+
+    @app.errorhandler(500)
+    def handle_500(error):
+        """Handle 500 Internal Server errors."""
+        logger.error(f"500 error: {error}")
+        return render_template(
+            "error.html",
+            error_message="An internal server error occurred. Please try again later.",
+            error_code="500",
+        ), 500
+
+    @app.errorhandler(503)
+    def handle_503(error):
+        """Handle 503 Service Unavailable errors."""
+        logger.error(f"503 error: {error}")
+        return render_template(
+            "error.html",
+            error_message="The service is temporarily unavailable. Please try again in a few moments.",
+            error_code="503",
+        ), 503
+
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        """Handle all unhandled exceptions."""
+        logger.error(f"Unhandled exception: {error}", exc_info=True)
+
+        # In development, show the actual error
+        if app.config.get("DEBUG"):
+            raise error
+
+        return render_template(
+            "error.html",
+            error_message="An unexpected error occurred. Please try again later.",
+            error_code="500",
+        ), 500
 
 
 def create_database_tables():

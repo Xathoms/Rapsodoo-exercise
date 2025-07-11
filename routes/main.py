@@ -123,16 +123,3 @@ def _get_available_dates_sample(limit: int = 30) -> list:
     except Exception as e:
         logger.error(f"Failed to get available dates sample: {e}")
         return []
-
-
-@main_bp.errorhandler(404)
-def not_found(error):
-    """Handle 404 Not Found errors with user-friendly error page."""
-    return render_template("error.html", error_message="Page not found."), 404
-
-
-@main_bp.errorhandler(500)
-def internal_error(error):
-    """Handle 500 Internal Server errors with logging and generic user message."""
-    logger.error(f"Internal server error: {error}")
-    return render_template("error.html", error_message="Internal server error."), 500
