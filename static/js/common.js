@@ -5,28 +5,23 @@
  * while ensuring users see updated data when available. It includes user activity
  * tracking, visibility detection, and soft refresh mechanisms.
  *
- * Features:
- * - Activity-based refresh (stops when user is inactive)
- * - Visibility-based refresh (pauses when tab is hidden)
- * - Soft refresh using API calls instead of page reloads
- * - Connectivity monitoring and graceful degradation
- * - User notification system for available updates
  *
  * @class RefreshManager
  */
 class RefreshManager {
   /**
-   * Initialize the smart refresh manager with default settings.
+   * Initialize the refresh manager with configuration.
    *
    * Sets up activity tracking, visibility monitoring, and refresh intervals
-   * with sensible defaults that balance data freshness with performance.
    */
   constructor() {
     this.refreshInterval = null;
     this.lastActivity = Date.now();
     this.isVisible = true;
-    this.refreshIntervalMinutes = 60;
-    this.maxInactiveMinutes = 30;
+
+    this.refreshIntervalMinutes =
+      window.appConfig?.refreshIntervalMinutes || 60;
+    this.maxInactiveMinutes = window.appConfig?.maxInactiveMinutes || 30;
 
     this.init();
   }
@@ -105,12 +100,10 @@ class RefreshManager {
 
     this.refreshInterval = setInterval(() => {
       if (!this.isVisible) {
-        console.log('🚫 Page not visible, skipping refresh');
         return;
       }
 
       if (!this.isUserActive()) {
-        console.log('🚫 User inactive, stopping auto-refresh');
         this.stopRefresh();
         return;
       }
@@ -129,7 +122,6 @@ class RefreshManager {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
-      console.log('⏹️ Auto-refresh stopped');
     }
   }
 
@@ -153,16 +145,6 @@ class RefreshManager {
       const data = await response.json();
 
       const lastUpdateElement = document.querySelector('[data-last-update]');
-      if (lastUpdateElement && data.metadata?.generated_at) {
-        const currentUpdate = lastUpdateElement.dataset.lastUpdate;
-        const newUpdate = data.metadata.generated_at;
-
-        if (currentUpdate !== newUpdate) {
-          console.log('✅ Data is outdated, refresh needed');
-        } else {
-          console.log('✅ Data is up to date, no refresh needed');
-        }
-      }
     } catch (error) {
       console.warn('⚠️ Soft refresh failed:', error.message);
     }
@@ -216,7 +198,10 @@ function validateSearchForm() {
   if (dateInput && dateInput.value) {
     const selectedDate = new Date(dateInput.value);
     const today = new Date();
-    const minDate = new Date('2020-02-24');
+
+    const historicalStartDate =
+      window.appConfig?.historicalStartDate || '2020-02-24';
+    const minDate = new Date(historicalStartDate);
 
     if (selectedDate > today) {
       showToast('Cannot select future dates', 'warning');
@@ -225,7 +210,7 @@ function validateSearchForm() {
 
     if (selectedDate < minDate) {
       showToast(
-        'Data only available from February 24, 2020 onwards',
+        `Data only available from ${historicalStartDate} onwards`,
         'warning'
       );
       return false;
@@ -320,14 +305,17 @@ document.addEventListener('DOMContentLoaded', function () {
       if (this.value) {
         const selectedDate = new Date(this.value);
         const today = new Date();
-        const minDate = new Date('2020-02-24');
+
+        const historicalStartDate =
+          window.appConfig?.historicalStartDate || '2020-02-24';
+        const minDate = new Date(historicalStartDate);
 
         if (selectedDate > today) {
           showToast('Cannot select future dates', 'warning');
           this.value = '';
         } else if (selectedDate < minDate) {
           showToast(
-            'Data only available from February 24, 2020 onwards',
+            `Data only available from ${historicalStartDate} onwards`,
             'warning'
           );
           this.value = '';

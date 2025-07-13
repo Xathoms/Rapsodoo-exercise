@@ -1,12 +1,14 @@
 import logging
-from datetime import datetime, date, timezone, timedelta
-from typing import List, Union, Optional, Set, Tuple
+from datetime import date, datetime, timedelta, timezone
+from typing import List, Optional, Set, Tuple, Union
+
+from flask import current_app
 from sqlalchemy import func
 
 from database import db
-from models.data_classes import RegionalSummary
-from models.covid_data import CovidDataRecord
 from models.cache import DataCache
+from models.covid_data import CovidDataRecord
+from models.data_classes import RegionalSummary
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,9 @@ class CacheService:
         """
         try:
             now = datetime.now(timezone.utc)
+            full_refresh_seconds = (
+                current_app.config.get("CACHE_FULL_REFRESH_HOURS", 24) * 60 * 60
+            )
 
             full_cache = DataCache.query.filter_by(cache_type="full").first()
             latest_cache = DataCache.query.filter_by(cache_type="latest").first()
@@ -55,9 +60,9 @@ class CacheService:
 
             full_cache_age = now - full_last_fetch
 
-            if full_cache_age.total_seconds() > (24 * 60 * 60):
+            if full_cache_age.total_seconds() > full_refresh_seconds:
                 logger.info(
-                    "Full cache is older than 24 hours, performing full refresh"
+                    f"Full cache is older than {current_app.config.get('CACHE_FULL_REFRESH_HOURS', 24)} hours, performing full refresh"
                 )
                 return True, "full"
 
@@ -209,7 +214,9 @@ class CacheService:
 
         Should be called periodically (e.g., daily) to maintain cache accuracy.
         """
-        cutoff = date.today() - timedelta(days=1)
+        cleanup_days = current_app.config.get("MISSING_DATES_CLEANUP_DAYS", 1)
+
+        cutoff = date.today() - timedelta(days=cleanup_days)
         initial_count = len(self._known_missing_dates)
 
         self._known_missing_dates = {d for d in self._known_missing_dates if d > cutoff}

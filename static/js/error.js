@@ -131,7 +131,6 @@ class ErrorPageManager {
 document.addEventListener('DOMContentLoaded', () => {
   try {
     window.errorPageManager = new ErrorPageManager();
-    console.log('✅ Error page minimal functionality loaded');
   } catch (error) {
     console.error('❌ Failed to initialize error page manager:', error);
   }

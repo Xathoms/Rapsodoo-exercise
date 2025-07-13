@@ -23,9 +23,7 @@ def parse_date_input(date_input: str) -> Optional[date]:
         try:
             parsed_date = datetime.strptime(date_input.strip(), fmt).date()
 
-            historical_start = current_app.config.get(
-                "HISTORICAL_START_DATE", date(2020, 2, 24)
-            )
+            historical_start = current_app.config.get("HISTORICAL_START_DATE")
             if parsed_date >= historical_start and parsed_date <= date.today():
                 return parsed_date
         except ValueError:

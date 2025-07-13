@@ -320,7 +320,11 @@ class CovidDataService:
                             continue
 
                     if records_by_timestamp:
-                        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+                        cleanup_days = current_app.config.get("CACHE_CLEANUP_DAYS", 7)
+                        cutoff_date = datetime.now(timezone.utc) - timedelta(
+                            days=cleanup_days
+                        )
+
                         old_records = (
                             db.session.query(CovidDataRecord)
                             .filter(CovidDataRecord.data_timestamp < cutoff_date)
@@ -328,7 +332,9 @@ class CovidDataService:
                         )
 
                         if old_records > 0:
-                            logger.info(f"Cleaned up {old_records} old records")
+                            logger.info(
+                                f"Cleaned up {old_records} old records (older than {cleanup_days} days)"
+                            )
 
                     bulk_data = []
                     for province in records_by_timestamp.values():

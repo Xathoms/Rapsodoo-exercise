@@ -55,6 +55,13 @@
           </p>
         </div>
       </div>
+      <script>
+        window.appConfig = {
+          refreshIntervalMinutes: '{{ config.DATA_CACHE_MINUTES }}',
+          maxInactiveMinutes: '{{ config.USER_INACTIVE_MINUTES }}',
+          historicalStartDate: '{{ config.HISTORICAL_START_DATE.isoformat() }}',
+        };
+      </script>
       <script src="{{ url_for('static', filename='js/common.js') }}"></script>
       <script src="{{ url_for('static', filename='js/table-sorting.js') }}"></script>
       <script src="{{ url_for('static', filename='js/excel-export.js') }}"></script>
